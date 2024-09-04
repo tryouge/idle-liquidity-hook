@@ -209,7 +209,7 @@ contract LiquidityHook is BaseHook {
 		
 		// Update lastTick to new currentTick
 		liquidityState[poolId].lastTick = currentTick
-		
+
         return (this.afterSwap.selector, 0);
     }
 

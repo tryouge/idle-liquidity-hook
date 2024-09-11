@@ -12,7 +12,7 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "v4-core/types/Currency.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 
-// import {UniswapV4ERC20} from "v4-periphery/libraries/UniswapV4ERC20.sol";
+import {UniswapV4ERC20} from "v4-periphery/libraries/UniswapV4ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -107,6 +107,7 @@ contract LiquidityHook is BaseHook {
         return this.afterInitialize.selector;
     }
 
+	// TODO(tryouge): Implement this function
     function beforeRemoveLiquidity(
         address sender,
         PoolKey calldata key,
@@ -137,7 +138,7 @@ contract LiquidityHook is BaseHook {
         (uint160 sqrtPriceX96, int24 currentTick,,) = poolManager.getSlot0(poolId);
         if (sqrtPriceX96 == 0) revert PoolNotInitialized();
 
-        // Deciding what ticks to deposit into Lending Protocol
+        // Step 1: Deciding what ticks to deposit into Lending Protocol
 
         // If LP position tickLower > currentTick + tickBuffer
         // (or) tickUpper < currentTick - tickBuffer
@@ -170,9 +171,7 @@ contract LiquidityHook is BaseHook {
             }
         }
 
-        // Need someway to track sender's LP position so they can also remove LP position appropriately
-        // Access sender's original LP position in beforeRemoveLiquidity and withdraw the
-        // the required liquidity from the lending protocol to return back to the user
+        // TODO(tryouge): Step 2: Mint NFT token corresponding to sender's liquidity so they can also remove it appropriately
 
         return (this.afterAddLiquidity.selector, delta);
     }
@@ -209,25 +208,24 @@ contract LiquidityHook is BaseHook {
         return (this.afterSwap.selector, 0);
     }
 
-    // Function that moves liquidity (tickLower, tickUpper) from pool to lending protocol
+    // TODO(gulshan): Function that moves liquidity (tickLower, tickUpper) from pool to lending protocol
     function depositIntoLendingProtocol(int24 tickLower, int24 tickUpper) private {
-        // TODO
-        // Move into lending protocol
-        // Update totalLiquidityState mapping
+        
+        // Step 1: Move into lending protocol 
+        // Step 2: Update totalLiquidityState mapping
     }
 
-    // Function that withdraws liquidityAmount from lending protocol and deposits to pool (tickLower, tickUpper)
+    // TODO(gulshan): Function that withdraws liquidityAmount from lending protocol and deposits to pool (tickLower, tickUpper)
     function withdrawFromLendingProtocol(uint256 liquidityAmount, int24 tickLower, int24 tickUpper) private {
-        // TODO
-        // Withdraw from lending protocol, deposit into pool
-        // Update totalLiquidityState mapping
+		// Step 1: Withdraw appropriate amount from lending protocol
+		// Step 2: update totalLiquidityState mapping
+
     }
 
-    // Function that withdraws all liquidity corresponding to tickLower and tickUpper range
+    // TODO(gulshan): Function that withdraws all liquidity corresponding to tickLower and tickUpper range
     // from lending protocol and deposits to pool (tickLower, tickUpper)
     function withdrawAllFromLendingProtocol(int24 tickLower, int24 tickUpper) private {
-        // TODO
-        // Withdraw from lending protocol, deposit into pool
-        // Update totalLiquidityState mapping
+        // Step 1: Withdraw from lending protocol, deposit into pool
+        // Step 2:Update totalLiquidityState mapping
     }
 }

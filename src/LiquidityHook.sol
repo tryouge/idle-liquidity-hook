@@ -449,8 +449,6 @@ contract LiquidityHook is BaseHook, ERC20 {
         int128 amount1 = balanceDelta.amount1();
 
         console.logInt(amount1);
-        // console.logInt(int128(balanceDelta.amount0));
-        // console.logI
 
         // give to pool manager
         callbackData.key.currency0.settle(
@@ -467,107 +465,6 @@ contract LiquidityHook is BaseHook, ERC20 {
             false
         );
     }
-
-    // TODO: remove this method
-    // function depositIntoPool(
-    //     AddLiquidityParams calldata params,
-    //     uint128 _liquidityLeft,
-    //     uint160 sqrtPriceX96
-    // ) private {
-    //     (
-    //         uint256 amount0AfterLendingPool,
-    //         uint256 amount1AfterLendingPool
-    //     ) = LiquidityAmounts.getAmountsForLiquidity(
-    //             sqrtPriceX96,
-    //             TickMath.getSqrtPriceAtTick(params.tickLower),
-    //             TickMath.getSqrtPriceAtTick(params.tickUpper),
-    //             _liquidityLeft
-    //         );
-
-    //     params.currency0.settle(
-    //         poolManager,
-    //         address(this),
-    //         amount0AfterLendingPool,
-    //         false
-    //     );
-
-    //     params.currency1.settle(
-    //         poolManager,
-    //         address(this),
-    //         amount1AfterLendingPool,
-    //         false
-    //     );
-
-    //     params.currency0.take(
-    //         poolManager,
-    //         address(this),
-    //         amount0AfterLendingPool,
-    //         true // true = mint claim tokens for the hook, equivalent to money we just deposited to the PM
-    //     );
-
-    //     params.currency1.take(
-    //         poolManager,
-    //         address(this),
-    //         amount1AfterLendingPool,
-    //         true // true = mint claim tokens for the hook, equivalent to money we just deposited to the PM
-    //     );
-
-    //     (BalanceDelta balanceDelta, ) = poolManager.modifyLiquidity(
-    //         params.key,
-    //         IPoolManager.ModifyLiquidityParams({
-    //             tickLower: params.tickLower,
-    //             tickUpper: params.tickUpper,
-    //             liquidityDelta: int256(uint256(_liquidityLeft)), // TODO: precision loss ??
-    //             salt: 0 // TODO: add user address to differentiate between same position but different users
-    //         }),
-    //         bytes("")
-    //     );
-
-    //     int128 amount0 = balanceDelta.amount0();
-
-    //     console.logInt(amount0);
-
-    //     int128 amount1 = balanceDelta.amount1();
-
-    //     console.logInt(amount1);
-    //     // console.logInt(int128(balanceDelta.amount0));
-    //     // console.logI
-
-    //     // give to pool manager
-    //     params.key.currency0.settle(
-    //         poolManager,
-    //         address(this),
-    //         uint256(int256(-balanceDelta.amount0())),
-    //         false
-    //     );
-
-    //     params.key.currency1.settle(
-    //         poolManager,
-    //         address(this),
-    //         uint256(int256(-balanceDelta.amount1())),
-    //         false
-    //     );
-    // }
-
-    // TODO(tryouge): Implement this function
-    // function beforeRemoveLiquidity(
-    //     address sender,
-    //     PoolKey calldata key,
-    //     IPoolManager.ModifyLiquidityParams calldata params,
-    //     bytes calldata hookData
-    // ) external override returns (bytes4) {
-    //     PoolId poolId = key.toId();
-    //     (uint160 sqrtPriceX96, int24 currentTick,,) = poolManager.getSlot0(poolId);
-    //     if (sqrtPriceX96 == 0) revert PoolNotInitialized();
-
-    //     // Deciding how much has to be removed from Lending Protocol
-
-    //     if (params.tickLower > currentTick + tickBuffer || params.tickUpper < currentTick - tickBuffer) {
-    //         // withdrawFromLendingProtocol(params.tickLower, params.tickUpper);
-    //     }
-
-    //     return this.beforeRemoveLiquidity.selector;
-    // }
 
     // TODO(tryouge): Implement afterswap
     function afterSwap(

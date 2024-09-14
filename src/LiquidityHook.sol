@@ -435,7 +435,7 @@ contract LiquidityHook is BaseHook, ERC20 {
                 tickLower: callbackData.tickLower,
                 tickUpper: callbackData.tickUpper,
                 liquidityDelta: int256(
-                    uint256(liquidityLeft - 10)
+                    uint256(liquidityLeft)
                 ), // TODO: precision loss ??
                 salt: 0 // TODO: add user address to differentiate between same position but different users
             }),

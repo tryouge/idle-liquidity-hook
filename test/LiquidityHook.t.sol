@@ -33,19 +33,32 @@ contract TestLiquidityHook is Test, Deployers {
 
         uint160 flags = uint160(Hooks.BEFORE_ADD_LIQUIDITY_FLAG);
 
-        deployCodeTo("LiquidityHook.sol", abi.encode(manager, "Points Token", "TEST_POINTS"), address(flags));
+        deployCodeTo(
+            "LiquidityHook.sol",
+            abi.encode(manager, "Points Token", "TEST_POINTS"),
+            address(flags)
+        );
 
         hook = LiquidityHook(address(flags));
 
         token0 = new MockERC20("Test Token 0", "TEST0", 18);
         currencytoken0 = Currency.wrap(address(token0));
         token0.mint(address(this), 1000 ether);
+        token0.mint(address(hook), 1000 ether);
 
         token1 = new MockERC20("Test Token 1", "TEST1", 18);
         currencytoken1 = Currency.wrap(address(token1));
         token1.mint(address(this), 1000 ether);
+        token1.mint(address(hook), 1000 ether);
 
-        (key,) = initPool(currencytoken0, currencytoken1, hook, 3000, SQRT_PRICE_1_1, ZERO_BYTES);
+        (key, ) = initPool(
+            currencytoken0,
+            currencytoken1,
+            hook,
+            3000,
+            SQRT_PRICE_1_1,
+            ZERO_BYTES
+        );
 
         token0.approve(address(hook), type(uint256).max);
         token1.approve(address(hook), type(uint256).max);

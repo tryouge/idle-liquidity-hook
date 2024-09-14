@@ -356,8 +356,8 @@ contract LiquidityHook is BaseHook, ERC20 {
         // depositIntoPool(liquidity, currentTick - tickBuffer, currentTick + tickBuffer);
         // reference: LiquidityAmounts.getAmountsForLiquidity(liquidity)
         console.log("liquidity ", liquidity);
-        // confirm unlock needs to be called here ??
-        // deposit to pool. TODO: create deposit into method
+
+        // adding into pool
         poolManager.unlock(
             abi.encode(
                 CallbackData(

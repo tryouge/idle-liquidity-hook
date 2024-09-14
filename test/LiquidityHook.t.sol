@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "forge-std/console.sol";
+
 import "forge-std/Test.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
@@ -128,6 +130,28 @@ contract TestLiquidityHook is Test, Deployers {
 
         // TODO(gulshan): Add an assertion checking liquidity/balance of pool after implementing
         // liquidity modification to pool
+
+        uint token0ClaimID = CurrencyLibrary.toId(key.currency0);
+        uint token1ClaimID = CurrencyLibrary.toId(key.currency1);
+
+        console.log(token0ClaimID);
+        console.log(token1ClaimID);
+        uint token0ClaimsBalance = manager.balanceOf(
+            address(hook),
+            token0ClaimID
+        );
+
+        console.log(token0ClaimsBalance);
+        uint token1ClaimsBalance = manager.balanceOf(
+            address(hook),
+            token1ClaimID
+        );
+
+        assertEq(token0ClaimsBalance, 5e18);
+        assertEq(token1ClaimsBalance, 4000999699945048502);
+
+        console.log(token1ClaimsBalance);
+
     }
 
     // TODO(gulshan): Start test for afterSwap()

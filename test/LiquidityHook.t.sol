@@ -45,54 +45,15 @@ contract TestLiquidityHook is Test, Deployers {
         currencytoken1 = Currency.wrap(address(token1));
         token1.mint(address(this), 1000 ether);
 
-        (key,) = initPool(currencytoken0, currencytoken1, hook, 3000, SQRT_PRICE_1_1, ZERO_BYTES);
+        (key,) = initPool(currencytoken0, currencytoken1, hook, 3000, 10, SQRT_PRICE_1_1, ZERO_BYTES);
 
         token0.approve(address(hook), type(uint256).max);
         token1.approve(address(hook), type(uint256).max);
     }
 
-    // function test_addLiquidityOutOfRange() public {
-    //     // Added tick range [60, 100] outside of the current tick buffer [-20, 20]
-    //     hook.addLiquidity(
-    //         LiquidityHook.AddLiquidityParams(
-    //             key.currency0,
-    //             key.currency1,
-    //             address(this),
-    //             10 ether,
-    //             10 ether,
-    //             60, // tick lower
-    //             100, // tick upper
-    //             key
-    //         )
-    //     );
-
-    //     // Added tick range [-100, -60] outside of the current tick buffer [-20, 20]
-    //     hook.addLiquidity(
-    //         LiquidityHook.AddLiquidityParams(
-    //             key.currency0,
-    //             key.currency1,
-    //             address(this),
-    //             5 ether,
-    //             5 ether,
-    //             -100, // tick lower
-    //             -60, // tick upper
-    //             key
-    //         )
-    //     );
-
-    //     // For the tick range to the right of the current tick buffer, all the liquidity
-    //     // would be held as token0 and all of it will go to the lending protocol
-    //     assertApproxEqAbs(token0.balanceOf(address(1)), 10 ether, 0.0001 ether);
-
-    //     // For the tick range to the left of the current tick buffer, all the liquidity
-    //     // would be held as token1 and all of it will go to the lending protocol
-    //     assertApproxEqAbs(token1.balanceOf(address(1)), 5 ether, 0.0001 ether);
-
-    //     // TODO(gulshan): Add an assertion checking liquidity/balance of pool after implementing
-    //     // liquidity modification to pool
-    // }
-
-    function test_addLiquidityInRange() public {
+    function test_addLiquidityOutOfRange() public {
+        // Added tick range [60, 100] outside of the current tick buffer [-20, 20]
+        // Liquidity generated = 5020289210583797046149
         hook.addLiquidity(
             LiquidityHook.AddLiquidityParams(
                 key.currency0,
@@ -100,22 +61,80 @@ contract TestLiquidityHook is Test, Deployers {
                 address(this),
                 10 ether,
                 10 ether,
-                -40, // tick lower
-                50, // tick upper
+                60, // tick lower
+                100, // tick upper
                 key
             )
         );
 
-        // 5 Inactive ticks i.e [-40, -30, 30, 40, 50]
-        // 5 active ticks i.e [-20, -10, 0, 10, 20]
-        // Overall Liquidity Position requires 10 eth token 0 and 8 eth token 1
-        // Hence, should be split evenly between pool and lending protocol
-        assertApproxEqAbs(token0.balanceOf(address(1)), 5 ether, 0.01 ether);
-        assertApproxEqAbs(token1.balanceOf(address(1)), 4 ether, 0.01 ether);
+        // Added tick range [-100, -60] outside of the current tick buffer [-20, 20]
+        // Liquidity generated = 2510144605291898523074
+        // hook.addLiquidity(
+        //     LiquidityHook.AddLiquidityParams(
+        //         key.currency0,
+        //         key.currency1,
+        //         address(this),
+        //         5 ether,
+        //         5 ether,
+        //         -100, // tick lower
+        //         -60, // tick upper
+        //         key
+        //     )
+        // );
+
+        // For the tick range to the right of the current tick buffer, all the liquidity
+        // would be held as token0 and all of it will go to the lending protocol
+        assertApproxEqAbs(token0.balanceOf(address(1)), 10 ether, 0.0001 ether);
+
+        // For the tick range to the left of the current tick buffer, all the liquidity
+        // would be held as token1 and all of it will go to the lending protocol
+        // assertApproxEqAbs(token1.balanceOf(address(1)), 5 ether, 0.0001 ether);
+
+        console.log("Liquidity Balance of User: %d\n", hook.balanceOf(address(this)));
+
+        // hook.removeLiquidity(
+        //     LiquidityHook.RemoveLiquidityParams(
+        //         key.currency0,
+        //         key.currency1,
+        //         address(this),
+        //         2510144605291898523074,
+        //         60, // tick lower
+        //         100, // tick upper
+        //         key
+        //     )
+        // );
+
+        // assertApproxEqAbs(token0.balanceOf(address(this)), 5 ether, 0.0001 ether);
+        // assertApproxEqAbs(token0.balanceOf(address(1)), 5 ether, 0.0001 ether);
 
         // TODO(gulshan): Add an assertion checking liquidity/balance of pool after implementing
         // liquidity modification to pool
     }
+
+    // function test_addLiquidityInRange() public {
+    //     hook.addLiquidity(
+    //         LiquidityHook.AddLiquidityParams(
+    //             key.currency0,
+    //             key.currency1,
+    //             address(this),
+    //             10 ether,
+    //             10 ether,
+    //             -40, // tick lower
+    //             50, // tick upper
+    //             key
+    //         )
+    //     );
+
+    //     // 5 Inactive ticks i.e [-40, -30, 30, 40, 50]
+    //     // 5 active ticks i.e [-20, -10, 0, 10, 20]
+    //     // Overall Liquidity Position requires 10 eth token 0 and 8 eth token 1
+    //     // Hence, should be split evenly between pool and lending protocol
+    //     assertApproxEqAbs(token0.balanceOf(address(1)), 5 ether, 0.01 ether);
+    //     assertApproxEqAbs(token1.balanceOf(address(1)), 4 ether, 0.01 ether);
+
+    //     // TODO(gulshan): Add an assertion checking liquidity/balance of pool after implementing
+    //     // liquidity modification to pool
+    // }
 
     // TODO(gulshan): Start test for afterSwap()
     // Rememeber to change the hook permissions flags and deployment in test :)

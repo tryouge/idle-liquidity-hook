@@ -63,7 +63,6 @@ contract TestLiquidityHook is Test, Deployers {
         token0.approve(address(hook), type(uint256).max);
 		token1.approve(address(hook), type(uint256).max);
 
-        // hook.addLiquidity(key, 1e18);
     }
 
     function test_addLiquidityOutOfRange() public {
@@ -97,32 +96,43 @@ contract TestLiquidityHook is Test, Deployers {
 		);
 
 		// For the tick range to the right of the current tick buffer, all the liquidity
-		// would be held as token0
+		// would be held as token0 and all of it will go to the lending protocol
 		assertApproxEqAbs(token0.balanceOf(address(1)), 10 ether, 0.0001 ether);
 
 		// For the tick range to the left of the current tick buffer, all the liquidity
-		// would be held as token1
+		// would be held as token1 and all of it will go to the lending protocol
 		assertApproxEqAbs(token1.balanceOf(address(1)), 5 ether, 0.0001 ether);
+
+		// TODO(gulshan): Add an assertion checking liquidity/balance of pool after implementing
+		// liquidity modification to pool
     }
 
-	// function test_addLiquidityInRange() public {
+	function test_addLiquidityInRange() public {
 
-		
+		hook.addLiquidity(
+			LiquidityHook.AddLiquidityParams(
+				key.currency0,
+				key.currency1,
+				address(this),
+				10 ether,
+				10 ether,
+				-40, // tick lower
+				50, // tick upper
+				key
+			)
+		);
 
-	// 	hook.addLiquidity(
-	// 		LiquidityHook.AddLiquidityParams(
-	// 			key.currency0,
-	// 			key.currency1,
-	// 			address(this),
-	// 			10 ether,
-	// 			10 ether,
-	// 			60, // tick lower
-	// 			100, // tick upper
-	// 			key
-	// 		)
-	// 	);
+		// 5 Inactive ticks i.e [-40, -30, 30, 40, 50]
+		// 5 active ticks i.e [-20, -10, 0, 10, 20]
+		// Overall Liquidity Position requires 10 eth token 0 and 8 eth token 1
+		// Hence, should be split evenly between pool and lending protocol
+		assertApproxEqAbs(token0.balanceOf(address(1)), 5 ether, 0.01 ether);
+		assertApproxEqAbs(token1.balanceOf(address(1)), 4 ether, 0.01 ether);
 
-	// 	assertApproxEqAbs(token0.balanceOf(address(1)), 10 ether, 0.0001 ether);
+		// TODO(gulshan): Add an assertion checking liquidity/balance of pool after implementing
+		// liquidity modification to pool
+    }
 
-    // }
+	// TODO(gulshan): Start test for afterSwap()
+	
 }

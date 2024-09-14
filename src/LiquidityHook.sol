@@ -26,6 +26,8 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {FixedPointMathLib} from "solmate/src/utils/FixedPointMathLib.sol";
 import "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 
+import "./interfaces/ILending.sol";
+
 contract LiquidityHook is BaseHook, ERC20 {
     using StateLibrary for IPoolManager;
     using CurrencyLibrary for Currency;
@@ -37,7 +39,7 @@ contract LiquidityHook is BaseHook, ERC20 {
 
     int24 tickBuffer = 20;
 
-    address lendingProtocolAddress = address(1);
+    ILending public lendingProtocolAddress;
 
     uint256 token0AmountLendingProtocol = 0;
     uint256 token1AmountLendingProtocol = 0;
@@ -70,33 +72,43 @@ contract LiquidityHook is BaseHook, ERC20 {
     mapping(PoolId => PoolInfo) public poolInfo;
     mapping(PoolId => LiquidityState) public liquidityState;
 
-    mapping(int24 tick => mapping(bool inLendingProtocol => uint128 liquidity)) public totalLiquidityState;
+    mapping(int24 tick => mapping(bool inLendingProtocol => uint128 liquidity))
+        public totalLiquidityState;
 
     constructor(
         IPoolManager _poolManager,
         string memory _name,
         // Currently only one flat ERC20 assuming 1 pool only
-        string memory _symbol
-    ) BaseHook(_poolManager) ERC20(_name, _symbol) {}
+        string memory _symbol,
+        ILending _lendingProtocolAddress
+    ) BaseHook(_poolManager) ERC20(_name, _symbol) {
+        lendingProtocolAddress = _lendingProtocolAddress;
+    }
 
     // TODO(tryouge/gulshan): Change these appropriately
-    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
-        return Hooks.Permissions({
-            beforeInitialize: false,
-            afterInitialize: false,
-            beforeAddLiquidity: true,
-            beforeRemoveLiquidity: false,
-            afterAddLiquidity: false,
-            afterRemoveLiquidity: false,
-            beforeSwap: false,
-            afterSwap: false,
-            beforeDonate: false,
-            afterDonate: false,
-            beforeSwapReturnDelta: false,
-            afterSwapReturnDelta: false,
-            afterAddLiquidityReturnDelta: false,
-            afterRemoveLiquidityReturnDelta: false
-        });
+    function getHookPermissions()
+        public
+        pure
+        override
+        returns (Hooks.Permissions memory)
+    {
+        return
+            Hooks.Permissions({
+                beforeInitialize: false,
+                afterInitialize: false,
+                beforeAddLiquidity: true,
+                beforeRemoveLiquidity: false,
+                afterAddLiquidity: false,
+                afterRemoveLiquidity: false,
+                beforeSwap: false,
+                afterSwap: false,
+                beforeDonate: false,
+                afterDonate: false,
+                beforeSwapReturnDelta: false,
+                afterSwapReturnDelta: false,
+                afterAddLiquidityReturnDelta: false,
+                afterRemoveLiquidityReturnDelta: false
+            });
     }
 
     // function beforeInitialize(address, PoolKey calldata key, uint160, bytes calldata)
@@ -109,26 +121,30 @@ contract LiquidityHook is BaseHook, ERC20 {
     //     return this.beforeInitialize.selector;
     // }
 
-    function afterInitialize(address, PoolKey calldata key, uint160, int24 tick, bytes calldata)
-        external
-        override
-        returns (bytes4)
-    {
+    function afterInitialize(
+        address,
+        PoolKey calldata key,
+        uint160,
+        int24 tick,
+        bytes calldata
+    ) external override returns (bytes4) {
         liquidityState[key.toId()] = LiquidityState(tick);
         return this.afterInitialize.selector;
     }
 
-    function beforeAddLiquidity(address, PoolKey calldata, IPoolManager.ModifyLiquidityParams calldata, bytes calldata)
-        external
-        pure
-        override
-        returns (bytes4)
-    {
+    function beforeAddLiquidity(
+        address,
+        PoolKey calldata,
+        IPoolManager.ModifyLiquidityParams calldata,
+        bytes calldata
+    ) external pure override returns (bytes4) {
         revert AddLiquidityThroughHook();
     }
 
     function addLiquidity(AddLiquidityParams calldata params) external {
-        (uint160 sqrtPriceX96, int24 currentTick,,) = poolManager.getSlot0(params.key.toId());
+        (uint160 sqrtPriceX96, int24 currentTick, , ) = poolManager.getSlot0(
+            params.key.toId()
+        );
         if (sqrtPriceX96 == 0) revert PoolNotInitialized();
 
         // Find total liquidity corresponding to the amounts
@@ -143,23 +159,36 @@ contract LiquidityHook is BaseHook, ERC20 {
         console.log("\nOverall Liquidity: %d", liquidity);
 
         // Finding amounts corresponding to total liquidity
-        (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            sqrtPriceX96,
-            TickMath.getSqrtPriceAtTick(params.tickLower),
-            TickMath.getSqrtPriceAtTick(params.tickUpper),
-            liquidity
-        );
+        (uint256 amount0, uint256 amount1) = LiquidityAmounts
+            .getAmountsForLiquidity(
+                sqrtPriceX96,
+                TickMath.getSqrtPriceAtTick(params.tickLower),
+                TickMath.getSqrtPriceAtTick(params.tickUpper),
+                liquidity
+            );
 
-        console.log("\nOverall Amounts - Amount0: %d \t Amount1: %d", amount0, amount1);
+        console.log(
+            "\nOverall Amounts - Amount0: %d \t Amount1: %d",
+            amount0,
+            amount1
+        );
         console.log("\nSender Address: %s", msg.sender);
 
         // Transfer tokens from user to hook contract
         if (amount0 > 0) {
-            IERC20(Currency.unwrap(params.key.currency0)).transferFrom(params.sender, address(this), amount0);
+            IERC20(Currency.unwrap(params.key.currency0)).transferFrom(
+                params.sender,
+                address(this),
+                amount0
+            );
         }
 
         if (amount1 > 0) {
-            IERC20(Currency.unwrap(params.key.currency1)).transferFrom(params.sender, address(this), amount1);
+            IERC20(Currency.unwrap(params.key.currency1)).transferFrom(
+                params.sender,
+                address(this),
+                amount1
+            );
         }
 
         console.log("\nTransferred Actual Tokens");
@@ -179,32 +208,59 @@ contract LiquidityHook is BaseHook, ERC20 {
         // Example: current tick buffer = [80, 120] and LP Positition = [60, 70] or [130, 140]
         // LP position has no overlap with current tick buffer range =>
         // deposit all liquidity into Lending Protocol
-        if (params.tickLower > currentTick + tickBuffer || params.tickUpper < currentTick - tickBuffer) {
+        if (
+            params.tickLower > currentTick + tickBuffer ||
+            params.tickUpper < currentTick - tickBuffer
+        ) {
             totalLendingProtocolLiquidity = liquidity;
-            addToTotalLiquidityState(totalLendingProtocolLiquidity, params.tickLower, params.tickUpper);
+            addToTotalLiquidityState(
+                totalLendingProtocolLiquidity,
+                params.tickLower,
+                params.tickUpper
+            );
             (lpamount0, lpamount1) = LiquidityAmounts.getAmountsForLiquidity(
                 sqrtPriceX96,
                 TickMath.getSqrtPriceAtTick(params.tickLower),
                 TickMath.getSqrtPriceAtTick(params.tickUpper),
                 totalLendingProtocolLiquidity
             );
-            depositIntoLendingProtocol(lpamount0, lpamount1, params.key.currency0, params.key.currency1);
+            depositIntoLendingProtocol(
+                lpamount0,
+                lpamount1,
+                params.key.currency0,
+                params.key.currency1
+            );
             console.log("Transferring whole Into Lending Protocol\n");
         }
 
         // Overlap with lower end of current tick buffer
-        if (params.tickLower < currentTick - tickBuffer && params.tickUpper > currentTick - tickBuffer) {
+        if (
+            params.tickLower < currentTick - tickBuffer &&
+            params.tickUpper > currentTick - tickBuffer
+        ) {
             // Example: current tick buffer = [80, 120] and LP Position = [60, 90] or [60, 140]
             // deposit [60, 70] into Lending Protocol
             // Calculate number of ticks for lending protocol
             console.log("\nTransferring partial to Lending Protocol (Lower)");
-            lendingProtocolTicks = _getTotalTicks(params.tickLower, currentTick - tickBuffer - 1);
+            lendingProtocolTicks = _getTotalTicks(
+                params.tickLower,
+                currentTick - tickBuffer - 1
+            );
             // Calculate liquidity to be deposited into lending protocol
-            lendingProtocolLiquidity = uint128(
-                uint24((lendingProtocolTicks * 1000) / _getTotalTicks(params.tickLower, params.tickUpper))
-            ) * (liquidity / 1000);
+            lendingProtocolLiquidity =
+                uint128(
+                    uint24(
+                        (lendingProtocolTicks * 1000) /
+                            _getTotalTicks(params.tickLower, params.tickUpper)
+                    )
+                ) *
+                (liquidity / 1000);
             // Update Liquidity State mapping
-            addToTotalLiquidityState(lendingProtocolLiquidity, params.tickLower, currentTick - tickBuffer - 1);
+            addToTotalLiquidityState(
+                lendingProtocolLiquidity,
+                params.tickLower,
+                currentTick - tickBuffer - 1
+            );
             // Calculate amount to be deposited into lending protocol
             (lpamount0, lpamount1) = LiquidityAmounts.getAmountsForLiquidity(
                 sqrtPriceX96,
@@ -219,20 +275,43 @@ contract LiquidityHook is BaseHook, ERC20 {
                 lpamount0,
                 lpamount1
             );
-            console.log("Overall Lending Protocol Liquidity: %d", totalLendingProtocolLiquidity);
-            depositIntoLendingProtocol(lpamount0, lpamount1, params.key.currency0, params.key.currency1);
+            console.log(
+                "Overall Lending Protocol Liquidity: %d",
+                totalLendingProtocolLiquidity
+            );
+            depositIntoLendingProtocol(
+                lpamount0,
+                lpamount1,
+                params.key.currency0,
+                params.key.currency1
+            );
         }
 
         // Overlap with upper end of current tick buffer
-        if (params.tickUpper > currentTick + tickBuffer && params.tickLower < currentTick + tickBuffer) {
+        if (
+            params.tickUpper > currentTick + tickBuffer &&
+            params.tickLower < currentTick + tickBuffer
+        ) {
             // Example: current tick buffer = [80, 120] and LP Position = [90, 130] or [60, 130]
             // deposit [130] into Lending Protocol
             console.log("\nTransferring partial to Lending Protocol (Lower)");
-            lendingProtocolTicks = _getTotalTicks(currentTick + tickBuffer + 1, params.tickUpper);
-            lendingProtocolLiquidity = uint128(
-                uint24((lendingProtocolTicks * 1000) / _getTotalTicks(params.tickLower, params.tickUpper))
-            ) * (liquidity / 1000);
-            addToTotalLiquidityState(lendingProtocolLiquidity, currentTick + tickBuffer + 1, params.tickUpper);
+            lendingProtocolTicks = _getTotalTicks(
+                currentTick + tickBuffer + 1,
+                params.tickUpper
+            );
+            lendingProtocolLiquidity =
+                uint128(
+                    uint24(
+                        (lendingProtocolTicks * 1000) /
+                            _getTotalTicks(params.tickLower, params.tickUpper)
+                    )
+                ) *
+                (liquidity / 1000);
+            addToTotalLiquidityState(
+                lendingProtocolLiquidity,
+                currentTick + tickBuffer + 1,
+                params.tickUpper
+            );
             (lpamount0, lpamount1) = LiquidityAmounts.getAmountsForLiquidity(
                 sqrtPriceX96,
                 TickMath.getSqrtPriceAtTick(params.tickLower),
@@ -246,8 +325,16 @@ contract LiquidityHook is BaseHook, ERC20 {
                 lpamount0,
                 lpamount1
             );
-            console.log("Overall Lending Protocol Liquidity: %d", totalLendingProtocolLiquidity);
-            depositIntoLendingProtocol(lpamount0, lpamount1, params.key.currency0, params.key.currency1);
+            console.log(
+                "Overall Lending Protocol Liquidity: %d",
+                totalLendingProtocolLiquidity
+            );
+            depositIntoLendingProtocol(
+                lpamount0,
+                lpamount1,
+                params.key.currency0,
+                params.key.currency1
+            );
         }
 
         // TODO(gulshan): Deposit remaining liquidity into pool
@@ -289,7 +376,9 @@ contract LiquidityHook is BaseHook, ERC20 {
         bytes calldata
     ) external override returns (bytes4, int128) {
         PoolId poolId = key.toId();
-        (uint160 sqrtPriceX96, int24 currentTick,,) = poolManager.getSlot0(poolId);
+        (uint160 sqrtPriceX96, int24 currentTick, , ) = poolManager.getSlot0(
+            poolId
+        );
         int24 lastTick = liquidityState[poolId].lastTick;
 
         // Tick cannot shift to a new tick beyond the last known tick's buffer since there is no liquidity outside
@@ -300,10 +389,18 @@ contract LiquidityHook is BaseHook, ERC20 {
         // Withdraw liquidity from lending protocol corresponding to [130] (121 to 130) and deposit into pool
         if (currentTick > lastTick) {
             moveAllFromPoolToLendingProtocol(
-                key.currency0, key.currency1, sqrtPriceX96, lastTick - tickBuffer, currentTick - tickBuffer - 1
+                key.currency0,
+                key.currency1,
+                sqrtPriceX96,
+                lastTick - tickBuffer,
+                currentTick - tickBuffer - 1
             );
             moveAllFromLendingProtocolToPool(
-                key.currency0, key.currency1, sqrtPriceX96, lastTick + tickBuffer + 1, currentTick + tickBuffer
+                key.currency0,
+                key.currency1,
+                sqrtPriceX96,
+                lastTick + tickBuffer + 1,
+                currentTick + tickBuffer
             );
         }
         // Tick has shifted from lastTick to currentTick (Ex: 100 [80, 120] -> 90 [70, 110])
@@ -311,10 +408,18 @@ contract LiquidityHook is BaseHook, ERC20 {
         // Withdraw liquidity from lending protocol corresponding to [70] (70 to 79) and deposit into pool
         else if (currentTick < lastTick) {
             moveAllFromPoolToLendingProtocol(
-                key.currency0, key.currency1, sqrtPriceX96, currentTick + tickBuffer + 1, lastTick + tickBuffer
+                key.currency0,
+                key.currency1,
+                sqrtPriceX96,
+                currentTick + tickBuffer + 1,
+                lastTick + tickBuffer
             );
             moveAllFromLendingProtocolToPool(
-                key.currency0, key.currency1, sqrtPriceX96, currentTick - tickBuffer, lastTick - tickBuffer - 1
+                key.currency0,
+                key.currency1,
+                sqrtPriceX96,
+                currentTick - tickBuffer,
+                lastTick - tickBuffer - 1
             );
         }
 
@@ -323,7 +428,11 @@ contract LiquidityHook is BaseHook, ERC20 {
         return (this.afterSwap.selector, 0);
     }
 
-    function addToTotalLiquidityState(uint128 liquidity, int24 tickLower, int24 tickUpper) private {
+    function addToTotalLiquidityState(
+        uint128 liquidity,
+        int24 tickLower,
+        int24 tickUpper
+    ) private {
         // add to totalLiquidityState mapping
         int24 totalTicks = _getTotalTicks(tickLower, tickUpper);
         uint128 eachTickLiquidity = liquidity / uint128(uint24(totalTicks));
@@ -334,35 +443,56 @@ contract LiquidityHook is BaseHook, ERC20 {
         for (int24 tick = modifiedTickLower; tick <= tickUpper; tick += 10) {
             overallLiquidityLendingProtocol += eachTickLiquidity;
             console.log("Tick: %d", tick);
-            if (totalLiquidityState[tick][true] == 0) totalLiquidityState[tick][true] = eachTickLiquidity;
+            if (totalLiquidityState[tick][true] == 0)
+                totalLiquidityState[tick][true] = eachTickLiquidity;
             else totalLiquidityState[tick][true] += eachTickLiquidity;
         }
     }
 
     // Function that transfer tokens from hook into Lending Protocol
-    function depositIntoLendingProtocol(uint256 amount0, uint256 amount1, Currency currency0, Currency currency1)
-        private
-    {
+    function depositIntoLendingProtocol(
+        uint256 amount0,
+        uint256 amount1,
+        Currency currency0,
+        Currency currency1
+    ) private {
         // Transfer tokens from hook contract to lending protocol
-        IERC20(Currency.unwrap(currency0)).transfer(lendingProtocolAddress, amount0);
+        IERC20(Currency.unwrap(currency0)).transfer(
+            address(lendingProtocolAddress),
+            amount0
+        );
 
         token0AmountLendingProtocol += amount0;
 
-        IERC20(Currency.unwrap(currency1)).transfer(lendingProtocolAddress, amount1);
+        IERC20(Currency.unwrap(currency1)).transfer(
+            address(lendingProtocolAddress),
+            amount1
+        );
 
         token1AmountLendingProtocol += amount1;
     }
 
     // Function that transfers tokens from Lending Protocol into hook
-    function withdrawFromLendingProtocol(uint256 amount0, uint256 amount1, Currency currency0, Currency currency1)
-        private
-    {
+    function withdrawFromLendingProtocol(
+        uint256 amount0,
+        uint256 amount1,
+        Currency currency0,
+        Currency currency1
+    ) private {
         // Transfer tokens from hook contract to lending protocol
-        IERC20(Currency.unwrap(currency0)).transferFrom(lendingProtocolAddress, address(this), amount0);
+        IERC20(Currency.unwrap(currency0)).transferFrom(
+            address(lendingProtocolAddress),
+            address(this),
+            amount0
+        );
 
         token0AmountLendingProtocol -= amount0;
 
-        IERC20(Currency.unwrap(currency1)).transferFrom(lendingProtocolAddress, address(this), amount1);
+        IERC20(Currency.unwrap(currency1)).transferFrom(
+            address(lendingProtocolAddress),
+            address(this),
+            amount1
+        );
 
         token1AmountLendingProtocol -= amount1;
     }
@@ -408,9 +538,13 @@ contract LiquidityHook is BaseHook, ERC20 {
         for (int24 tick = modifiedTickLower; tick <= tickUpper; tick += 10) {
             uint128 liquidity = totalLiquidityState[tick][true];
             // Finding amounts for particular tick liquidity
-            (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(
-                sqrtPriceX96, TickMath.getSqrtPriceAtTick(tick), TickMath.getSqrtPriceAtTick(tick), liquidity
-            );
+            (uint256 amount0, uint256 amount1) = LiquidityAmounts
+                .getAmountsForLiquidity(
+                    sqrtPriceX96,
+                    TickMath.getSqrtPriceAtTick(tick),
+                    TickMath.getSqrtPriceAtTick(tick),
+                    liquidity
+                );
             withdrawFromLendingProtocol(amount0, amount1, currency0, currency1);
             // TODO(gulshan): Add liquidity to tick in pool (corresponding to liquidity variable above)
             totalLiquidityState[tick][true] = 0;
@@ -418,7 +552,10 @@ contract LiquidityHook is BaseHook, ERC20 {
         }
     }
 
-    function _getTotalTicks(int24 tickLower, int24 tickUpper) internal pure returns (int24 totalTicks) {
+    function _getTotalTicks(
+        int24 tickLower,
+        int24 tickUpper
+    ) internal pure returns (int24 totalTicks) {
         return ((tickUpper - tickLower) / 10) + 1;
     }
 }

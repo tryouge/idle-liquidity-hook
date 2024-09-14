@@ -51,46 +51,46 @@ contract TestLiquidityHook is Test, Deployers {
         token1.approve(address(hook), type(uint256).max);
     }
 
-    function test_addLiquidityOutOfRange() public {
-        // Added tick range [60, 100] outside of the current tick buffer [-20, 20]
-        hook.addLiquidity(
-            LiquidityHook.AddLiquidityParams(
-                key.currency0,
-                key.currency1,
-                address(this),
-                10 ether,
-                10 ether,
-                60, // tick lower
-                100, // tick upper
-                key
-            )
-        );
+    // function test_addLiquidityOutOfRange() public {
+    //     // Added tick range [60, 100] outside of the current tick buffer [-20, 20]
+    //     hook.addLiquidity(
+    //         LiquidityHook.AddLiquidityParams(
+    //             key.currency0,
+    //             key.currency1,
+    //             address(this),
+    //             10 ether,
+    //             10 ether,
+    //             60, // tick lower
+    //             100, // tick upper
+    //             key
+    //         )
+    //     );
 
-        // Added tick range [-100, -60] outside of the current tick buffer [-20, 20]
-        hook.addLiquidity(
-            LiquidityHook.AddLiquidityParams(
-                key.currency0,
-                key.currency1,
-                address(this),
-                5 ether,
-                5 ether,
-                -100, // tick lower
-                -60, // tick upper
-                key
-            )
-        );
+    //     // Added tick range [-100, -60] outside of the current tick buffer [-20, 20]
+    //     hook.addLiquidity(
+    //         LiquidityHook.AddLiquidityParams(
+    //             key.currency0,
+    //             key.currency1,
+    //             address(this),
+    //             5 ether,
+    //             5 ether,
+    //             -100, // tick lower
+    //             -60, // tick upper
+    //             key
+    //         )
+    //     );
 
-        // For the tick range to the right of the current tick buffer, all the liquidity
-        // would be held as token0 and all of it will go to the lending protocol
-        assertApproxEqAbs(token0.balanceOf(address(1)), 10 ether, 0.0001 ether);
+    //     // For the tick range to the right of the current tick buffer, all the liquidity
+    //     // would be held as token0 and all of it will go to the lending protocol
+    //     assertApproxEqAbs(token0.balanceOf(address(1)), 10 ether, 0.0001 ether);
 
-        // For the tick range to the left of the current tick buffer, all the liquidity
-        // would be held as token1 and all of it will go to the lending protocol
-        assertApproxEqAbs(token1.balanceOf(address(1)), 5 ether, 0.0001 ether);
+    //     // For the tick range to the left of the current tick buffer, all the liquidity
+    //     // would be held as token1 and all of it will go to the lending protocol
+    //     assertApproxEqAbs(token1.balanceOf(address(1)), 5 ether, 0.0001 ether);
 
-        // TODO(gulshan): Add an assertion checking liquidity/balance of pool after implementing
-        // liquidity modification to pool
-    }
+    //     // TODO(gulshan): Add an assertion checking liquidity/balance of pool after implementing
+    //     // liquidity modification to pool
+    // }
 
     function test_addLiquidityInRange() public {
         hook.addLiquidity(

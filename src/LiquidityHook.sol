@@ -250,9 +250,10 @@ contract LiquidityHook is BaseHook, ERC20 {
             depositIntoLendingProtocol(lpamount0, lpamount1, params.key.currency0, params.key.currency1);
         }
 
-        // Deposit remaining liquidity into pool
+        // TODO(gulshan): Deposit remaining liquidity into pool
         // liquidity = liquidity - totalLendingProtocolLiquidity;
         // depositIntoPool(liquidity, currentTick - tickBuffer, currentTick + tickBuffer);
+        // reference: LiquidityAmounts.getAmountsForLiquidity(liquidity)
 
         // Mint ERC20 tokens corresponding to liquidity amount to user so they can claim later
         _mint(msg.sender, liquidity);

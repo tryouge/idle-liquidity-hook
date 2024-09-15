@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+
+import "forge-std/console.sol";
+
 import "forge-std/Test.sol";
 import {IHooks} from "v4-core/interfaces/IHooks.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
@@ -28,12 +31,17 @@ contract TestLiquidityHook is Test, Deployers {
 
         hookAddress = address(
             uint160(
-                Hooks.BEFORE_ADD_LIQUIDITY_FLAG 
-                    // Hooks.BEFORE_SWAP_FLAG |
-                    // Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
+                Hooks.BEFORE_ADD_LIQUIDITY_FLAG |
+                    Hooks.AFTER_REMOVE_LIQUIDITY_FLAG
+                // Hooks.BEFORE_SWAP_FLAG |
+                // Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG
             )
         );
-        deployCodeTo("LiquidityHook.sol:LiquidityHook", abi.encode(manager), hookAddress);
+        deployCodeTo(
+            "LiquidityHook.sol:LiquidityHook",
+            abi.encode(manager),
+            hookAddress
+        );
         hook = LiquidityHook(hookAddress);
 
         (key, ) = initPool(
@@ -56,9 +64,12 @@ contract TestLiquidityHook is Test, Deployers {
         );
 
         hook.addLiquidity(key, 1e18);
+
+        // hook.removeLiquidity(key, 300000000000000000);
+
     }
 
-    function test_claimTokenBalances() public view {
+    function test_claimTokenBalances() public  {
         uint token0ClaimID = CurrencyLibrary.toId(currency0);
         uint token1ClaimID = CurrencyLibrary.toId(currency1);
 
@@ -74,12 +85,19 @@ contract TestLiquidityHook is Test, Deployers {
         assertEq(token0ClaimsBalance, 5e17);
         assertEq(token1ClaimsBalance, 5e17);
 
-
-        uint256 balanceOfHookAddress = IERC20Minimal(Currency.unwrap(key.currency1)).balanceOf(
-            hookAddress
-        );
+        uint256 balanceOfHookAddress = IERC20Minimal(
+            Currency.unwrap(key.currency1)
+        ).balanceOf(hookAddress);
 
         assertEq(balanceOfHookAddress, 497009131119745168);
 
+        hook.removeLiquidity(key, 200000000000000000);
+
+        balanceOfHookAddress = IERC20Minimal(
+            Currency.unwrap(key.currency1)
+        ).balanceOf(hookAddress);
+
+        console.log(balanceOfHookAddress);
+        assertEq(balanceOfHookAddress, 498205478671847100);
     }
 }

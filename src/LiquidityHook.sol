@@ -14,7 +14,6 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {Currency} from "v4-core/types/Currency.sol";
 import {StateLibrary} from "v4-core/libraries/StateLibrary.sol";
 
-// import {UniswapV4ERC20} from "v4-periphery/libraries/UniswapV4ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -27,6 +26,9 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {FixedPointMathLib} from "solmate/src/utils/FixedPointMathLib.sol";
 
+import "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
+import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
+
 contract LiquidityHook is BaseHook {
     using StateLibrary for IPoolManager;
     // using CurrencyLibrary for Currency;
@@ -34,9 +36,14 @@ contract LiquidityHook is BaseHook {
 
     using PoolIdLibrary for PoolKey;
 
+    // using SafeCast for uint256;
+    // using SafeCast for uint128;
+
     error PoolNotInitialized();
     error TickSpacingNotDefault();
     error AddLiquidityThroughHook();
+
+    error AfterRemoveLiquidityThroughHook();
 
     int24 tickBuffer = 20;
 
@@ -63,6 +70,7 @@ contract LiquidityHook is BaseHook {
         Currency currency1;
         address sender;
         PoolKey key;
+        uint8 methodCall;
     }
 
     struct ModifyLiquidityCallbackData {
@@ -93,7 +101,7 @@ contract LiquidityHook is BaseHook {
                 beforeAddLiquidity: true,
                 beforeRemoveLiquidity: false,
                 afterAddLiquidity: false,
-                afterRemoveLiquidity: false,
+                afterRemoveLiquidity: true,
                 beforeSwap: false,
                 afterSwap: false,
                 beforeDonate: false,
@@ -333,6 +341,25 @@ contract LiquidityHook is BaseHook {
         revert AddLiquidityThroughHook();
     }
 
+    // function removeAddLiquidity(
+    //     address,
+    //     PoolKey calldata,
+    //     IPoolManager.ModifyLiquidityParams calldata,
+    //     bytes calldata
+    // ) external pure override returns (bytes4) {
+    //     revert AddLiquidityThroughHook();
+    // }
+
+    function afterRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata params,
+        BalanceDelta delta,
+        bytes calldata hookData
+    ) external pure override returns (bytes4, BalanceDelta) {
+        revert AfterRemoveLiquidityThroughHook();
+    }
+
     function addLiquidity(PoolKey calldata key, uint256 amountEach) external {
         poolManager.unlock(
             abi.encode(
@@ -341,7 +368,26 @@ contract LiquidityHook is BaseHook {
                     key.currency0,
                     key.currency1,
                     msg.sender,
-                    key
+                    key,
+                    1
+                )
+            )
+        );
+    }
+
+    function removeLiquidity(
+        PoolKey calldata key,
+        uint256 amountEach
+    ) external {
+        poolManager.unlock(
+            abi.encode(
+                CallbackData(
+                    amountEach,
+                    key.currency0,
+                    key.currency1,
+                    msg.sender,
+                    key,
+                    2
                 )
             )
         );
@@ -352,86 +398,156 @@ contract LiquidityHook is BaseHook {
     ) internal override returns (bytes memory) {
         CallbackData memory callbackData = abi.decode(data, (CallbackData));
 
+        if (callbackData.methodCall == 1) {
+            // user to hook contract
+            IERC20(Currency.unwrap(callbackData.key.currency0)).transferFrom(
+                callbackData.sender,
+                address(this),
+                callbackData.amountEach
+            );
 
-        // user to hook contract
-        IERC20(Currency.unwrap(callbackData.key.currency0)).transferFrom(
-            callbackData.sender,
-            address(this),
-            callbackData.amountEach
-        );
+            IERC20(Currency.unwrap(callbackData.key.currency1)).transferFrom(
+                callbackData.sender,
+                address(this),
+                callbackData.amountEach
+            );
 
-        IERC20(Currency.unwrap(callbackData.key.currency1)).transferFrom(
-            callbackData.sender,
-            address(this),
-            callbackData.amountEach
-        );
+            // hook to pool manager
+            callbackData.currency0.settle(
+                poolManager,
+                address(this),
+                callbackData.amountEach - amountToKeepInHook,
+                false // `burn` = `false` i.e. we're actually transferring tokens, not burning ERC-6909 Claim Tokens
+            );
 
-        // hook to pool manager
-        callbackData.currency0.settle(
-            poolManager,
-            address(this),
-            callbackData.amountEach - amountToKeepInHook,
-            false // `burn` = `false` i.e. we're actually transferring tokens, not burning ERC-6909 Claim Tokens
-        );
+            callbackData.currency1.settle(
+                poolManager,
+                address(this),
+                callbackData.amountEach - amountToKeepInHook,
+                false
+            );
 
-        callbackData.currency1.settle(
-            poolManager,
-            address(this),
-            callbackData.amountEach - amountToKeepInHook,
-            false
-        );
+            // as modify liquidity is done by us, we need to mint claim tokens from pool manager to hook
+            callbackData.currency0.take(
+                poolManager,
+                address(this),
+                callbackData.amountEach - amountToKeepInHook,
+                true // true = mint claim tokens for the hook, equivalent to money we just deposited to the PM
+            );
+            callbackData.currency1.take(
+                poolManager,
+                address(this),
+                callbackData.amountEach - amountToKeepInHook,
+                true
+            );
 
-        // as modify liquidity is done by us, we need to mint claim tokens from pool manager to hook
-        callbackData.currency0.take(
-            poolManager,
-            address(this),
-            callbackData.amountEach - amountToKeepInHook,
-            true // true = mint claim tokens for the hook, equivalent to money we just deposited to the PM
-        );
-        callbackData.currency1.take(
-            poolManager,
-            address(this),
-            callbackData.amountEach - amountToKeepInHook,
-            true
-        );
+            (BalanceDelta balanceDelta, ) = poolManager.modifyLiquidity(
+                callbackData.key,
+                IPoolManager.ModifyLiquidityParams({
+                    tickLower: -120,
+                    tickUpper: 120,
+                    liquidityDelta: int256(
+                        callbackData.amountEach - amountToKeepInHook
+                    ),
+                    salt: 0
+                }),
+                ZERO_BYTES
+            );
 
-        (BalanceDelta balanceDelta, ) = poolManager.modifyLiquidity(
-            callbackData.key,
-            IPoolManager.ModifyLiquidityParams({
-                tickLower: -120,
-                tickUpper: 120,
-                liquidityDelta: int256(
-                    callbackData.amountEach - amountToKeepInHook
-                ),
-                salt: 0
-            }),
-            ZERO_BYTES
-        );
+            int128 amount0 = balanceDelta.amount0();
 
-        int128 amount0 = balanceDelta.amount0();
+            console.logInt(amount0);
 
-        console.logInt(amount0);
+            int128 amount1 = balanceDelta.amount1();
 
-        int128 amount1 = balanceDelta.amount1();
+            console.logInt(amount1);
+            // console.logInt(int128(balanceDelta.amount0));
+            // console.logI
 
-        console.logInt(amount1);
-        // console.logInt(int128(balanceDelta.amount0));
-        // console.logI
+            // give to pool manager
+            callbackData.key.currency0.settle(
+                poolManager,
+                address(this),
+                uint256(int256(-balanceDelta.amount0())),
+                false
+            );
 
-        // give to pool manager
-        callbackData.key.currency0.settle(
-            poolManager,
-            address(this),
-            uint256(int256(-balanceDelta.amount0())),
-            false
-        );
+            callbackData.key.currency1.settle(
+                poolManager,
+                address(this),
+                uint256(int256(-balanceDelta.amount1())),
+                false
+            );
+        } else {
+            // depending on add liquidity params you may be required to give token0, token1, or both token0 and token1
 
-        callbackData.key.currency1.settle(
-            poolManager,
-            address(this),
-            uint256(int256(-balanceDelta.amount1())),
-            false
-        );
+            // but either way yes you'll be using settle
+
+            // basically you get back a BalanceDelta which has amount0 and amount1
+
+            // if (amount0 > 0) -> take token0
+            // if (amount1 > 0) -> take token1
+
+            // if (amount0 < 0) -> settle token0
+            // if (amount1 < 0) -> settle token1
+
+            (uint160 sqrtPriceX96, int24 currentTick, , ) = poolManager
+                .getSlot0(callbackData.key.toId());
+
+            (uint256 amount0, uint256 amount1) = LiquidityAmounts
+                .getAmountsForLiquidity(
+                    sqrtPriceX96,
+                    TickMath.getSqrtPriceAtTick(-120),
+                    TickMath.getSqrtPriceAtTick(120),
+                    uint128(callbackData.amountEach)
+                );
+
+            // burn ERC-6909 tokens
+            // callbackData.currency0.settle(
+            //     poolManager,
+            //     address(this),
+            //     amount0,
+            //     true
+            // );
+
+            // callbackData.currency1.settle(
+            //     poolManager,
+            //     address(this),
+            //     amount1,
+            //     true
+            // );
+
+            (BalanceDelta balanceDelta, ) = poolManager.modifyLiquidity(
+                callbackData.key,
+                IPoolManager.ModifyLiquidityParams({
+                    tickLower: -120,
+                    tickUpper: 120,
+                    liquidityDelta: -int256(callbackData.amountEach),
+                    salt: 0
+                }),
+                ZERO_BYTES
+            );
+
+            console.log(balanceDelta.amount0());
+            console.log(balanceDelta.amount1());
+            callbackData.currency0.take(
+                poolManager,
+                address(this),
+                uint256(uint128(balanceDelta.amount0())),
+                false // true = mint claim tokens for the hook, equivalent to money we just deposited to the PM
+            );
+
+            callbackData.currency1.take(
+                poolManager,
+                address(this),
+                uint256(uint128(balanceDelta.amount1())),
+                false
+            );
+
+            // at this step, balance is in hook contract
+            // we can call transfer method to send the tokens out to user
+
+        }
 
         return "";
     }

@@ -316,10 +316,10 @@ contract LiquidityHook is BaseHook, ERC20 {
                     TickMath.getSqrtPriceAtTick(callbackData.tickUpper),
                     liquidityLeft
                 );
-
-            console.log("amount0AfterLendingPool ", amount0AfterLendingPool);
-            console.log("amount1AfterLendingPool ", amount1AfterLendingPool);
-            console.log("params final liquidity left ", callbackData.liquidity);
+            console.log("\nPool Liquidity: %d, Pool Amount0: %d, Pool Amount1: %d", callbackData.liquidity, amount0AfterLendingPool, amount1AfterLendingPool);
+            // console.log("amount0AfterLendingPool ", amount0AfterLendingPool);
+            // console.log("amount1AfterLendingPool ", amount1AfterLendingPool);
+            // console.log("params final liquidity left ", callbackData.liquidity);
             callbackData.currency0.settle(
                 poolManager,
                 address(this),
@@ -363,11 +363,11 @@ contract LiquidityHook is BaseHook, ERC20 {
 
             int128 amount0 = balanceDelta.amount0();
 
-            console.logInt(amount0);
+            // console.logInt(amount0);
 
             int128 amount1 = balanceDelta.amount1();
 
-            console.logInt(amount1);
+            // console.logInt(amount1);
 
             // give to pool manager
             callbackData.key.currency0.settle(

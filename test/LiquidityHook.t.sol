@@ -162,6 +162,7 @@ contract TestLiquidityHook is Test, Deployers {
         assertApproxEqAbs(token0.balanceOf(address(1)), 0 ether, 0.01 ether);
         assertApproxEqAbs(token1.balanceOf(address(1)), 0 ether, 0.01 ether);
 
+
         uint token0ClaimID = CurrencyLibrary.toId(key.currency0);
         uint token1ClaimID = CurrencyLibrary.toId(key.currency1);
 

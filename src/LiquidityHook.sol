@@ -150,7 +150,7 @@ contract LiquidityHook is BaseHook, ERC20 {
     {
         revert AddLiquidityThroughHook();
     }
-
+    
     function addLiquidity(AddLiquidityParams calldata params) external {
         (uint160 sqrtPriceX96, int24 currentTick,,) = poolManager.getSlot0(params.key.toId());
         if (sqrtPriceX96 == 0) revert PoolNotInitialized();
